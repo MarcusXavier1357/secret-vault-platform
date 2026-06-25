@@ -148,7 +148,7 @@ func ListSecretsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(list)
 }
 
 func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +192,7 @@ func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(s)
+	_ = json.NewEncoder(w).Encode(s)
 }
 
 func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +300,7 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(SecretResponse{
+	_ = json.NewEncoder(w).Encode(SecretResponse{
 		ID:          secretID,
 		Name:        secretName,
 		Description: req.Description,

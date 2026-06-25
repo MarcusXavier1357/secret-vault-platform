@@ -3,7 +3,6 @@ package database
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -83,7 +82,7 @@ func RunMigrations(migrationsDir string) error {
 		return fmt.Errorf("failed to create schema_migrations table: %w", err)
 	}
 
-	files, err := ioutil.ReadDir(migrationsDir)
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		return fmt.Errorf("failed to read migrations directory: %w", err)
 	}
@@ -112,7 +111,7 @@ func RunMigrations(migrationsDir string) error {
 		}
 
 		fmt.Printf("Applying migration: %s\n", filename)
-		content, err := ioutil.ReadFile(filepath.Join(migrationsDir, filename))
+		content, err := os.ReadFile(filepath.Join(migrationsDir, filename))
 		if err != nil {
 			return fmt.Errorf("failed to read migration file %s: %w", filename, err)
 		}
