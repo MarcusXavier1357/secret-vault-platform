@@ -67,7 +67,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		secretID, req.Name, req.Description, status, req.ExpiresAt, nil, now, now,
 	)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
 			sendJSONError(w, "Nome do segredo já existe", http.StatusConflict)
 			return
@@ -82,7 +82,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		versionID, secretID, 1, encVal, nonce, now,
 	)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao armazenar o valor do segredo", http.StatusInternalServerError)
 		return
 	}
@@ -92,7 +92,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		versionID, secretID,
 	)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao associar o ID da versão atual", http.StatusInternalServerError)
 		return
 	}
@@ -107,7 +107,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(SecretResponse{
+	_ = json.NewEncoder(w).Encode(SecretResponse{
 		ID:          secretID,
 		Name:        req.Name,
 		Description: req.Description,
@@ -274,7 +274,7 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, newVersionID, secretID, newVersionNumber, encVal, nonce, now)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao armazenar nova versão do segredo", http.StatusInternalServerError)
 		return
 	}
@@ -285,7 +285,7 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE id = $6
 	`, req.Description, status, req.ExpiresAt, newVersionID, now, secretID)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao atualizar metadados do segredo", http.StatusInternalServerError)
 		return
 	}
@@ -341,5 +341,5 @@ func RevokeSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Segredo revogado com sucesso"}`))
+	_, _ = w.Write([]byte(`{"message":"Segredo revogado com sucesso"}`))
 }

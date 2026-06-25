@@ -74,7 +74,10 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 		}
 
 		var resp map[string]string
-		json.Unmarshal(rr.Body.Bytes(), &resp)
+		err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		if err != nil {
+			t.Fatalf("failed to unmarshal JSON: %v", err)
+		}
 		if resp["error"] != "Payload da requisição inválido" {
 			t.Errorf("expected error 'Payload da requisição inválido', got '%s'", resp["error"])
 		}
@@ -94,7 +97,10 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 		}
 
 		var resp map[string]string
-		json.Unmarshal(rr.Body.Bytes(), &resp)
+		err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		if err != nil {
+			t.Fatalf("failed to unmarshal JSON: %v", err)
+		}
 		if !strings.Contains(resp["error"], "Deve conter apenas letras maiúsculas") {
 			t.Errorf("expected validation message, got '%s'", resp["error"])
 		}
@@ -114,7 +120,10 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 		}
 
 		var resp map[string]string
-		json.Unmarshal(rr.Body.Bytes(), &resp)
+		err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		if err != nil {
+			t.Fatalf("failed to unmarshal JSON: %v", err)
+		}
 		if resp["error"] != "O valor do segredo não pode ser vazio" {
 			t.Errorf("expected error 'O valor do segredo não pode ser vazio', got '%s'", resp["error"])
 		}
@@ -136,7 +145,10 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 		}
 
 		var resp map[string]string
-		json.Unmarshal(rr.Body.Bytes(), &resp)
+		err := json.Unmarshal(rr.Body.Bytes(), &resp)
+		if err != nil {
+			t.Fatalf("failed to unmarshal JSON: %v", err)
+		}
 		if resp["error"] != "A data de expiração deve ser no futuro" {
 			t.Errorf("expected error 'A data de expiração deve ser no futuro', got '%s'", resp["error"])
 		}

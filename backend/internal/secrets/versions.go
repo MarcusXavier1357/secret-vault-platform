@@ -60,7 +60,7 @@ func ListSecretVersionsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(versions)
+	_ = json.NewEncoder(w).Encode(versions)
 }
 
 func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
@@ -139,7 +139,7 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 		VALUES ($1, $2, $3, $4, $5, $6)
 	`, newVersionID, secretID, newVersionNumber, encryptedVal, nonce, now)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao copiar conteúdo da versão de destino", http.StatusInternalServerError)
 		return
 	}
@@ -150,7 +150,7 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE id = $4
 	`, status, newVersionID, now, secretID)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		sendJSONError(w, "Falha ao atualizar a versão atual do segredo", http.StatusInternalServerError)
 		return
 	}
@@ -165,5 +165,5 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf(`{"message":"Revertido com sucesso para a versão %d. A nova versão é %d."}`, targetVersion, newVersionNumber)))
+	_, _ = w.Write([]byte(fmt.Sprintf(`{"message":"Revertido com sucesso para a versão %d. A nova versão é %d."}`, targetVersion, newVersionNumber)))
 }

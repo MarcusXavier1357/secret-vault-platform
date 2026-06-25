@@ -124,13 +124,13 @@ func RunMigrations(migrationsDir string) error {
 
 		_, err = tx.Exec(string(content))
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("failed to execute migration %s: %w", filename, err)
 		}
 
 		_, err = tx.Exec("INSERT INTO schema_migrations (version) VALUES ($1)", version)
 		if err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("failed to insert migration version %s: %w", filename, err)
 		}
 

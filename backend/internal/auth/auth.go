@@ -108,7 +108,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Login successful"}`))
+	_, _ = w.Write([]byte(`{"message":"Login successful"}`))
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +122,7 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message":"Logged out"}`))
+	_, _ = w.Write([]byte(`{"message":"Logged out"}`))
 }
 
 func AuthMiddleware(next http.Handler) http.Handler {
@@ -160,5 +160,5 @@ func CheckSessionHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"username": username})
+	_ = json.NewEncoder(w).Encode(map[string]string{"username": username})
 }
