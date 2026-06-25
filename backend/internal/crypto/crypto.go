@@ -21,12 +21,15 @@ var (
 	PublicKey *rsa.PublicKey
 	// PrivateKey is used for decryption (reads)
 	PrivateKey *rsa.PrivateKey
+	// PrivateKeyRing holds legacy/rotated keys for decryption fallback
+	PrivateKeyRing []*rsa.PrivateKey
 )
 
 func init() {
 	// 1. Try loading keys from environment variables
 	pubPem := os.Getenv("RSA_PUBLIC_KEY")
 	privPem := os.Getenv("RSA_PRIVATE_KEY")
+	ringPem := os.Getenv("RSA_PRIVATE_KEY_RING")
 
 	if pubPem != "" {
 		block, _ := pem.Decode([]byte(pubPem))
@@ -55,6 +58,26 @@ func init() {
 		}
 	}
 
+	if ringPem != "" {
+		rest := []byte(ringPem)
+		for {
+			var block *pem.Block
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			priv, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				priv, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			}
+			if err == nil {
+				if rsaPriv, ok := priv.(*rsa.PrivateKey); ok {
+					PrivateKeyRing = append(PrivateKeyRing, rsaPriv)
+				}
+			}
+		}
+	}
+
 	// 2. Fallback to generating keys for development/testing if none provided
 	if PublicKey == nil || PrivateKey == nil {
 		log.Println("WARNING: RSA keys not fully configured in env. Generating transient 2048-bit keys for dev/test.")
@@ -75,12 +98,28 @@ func Encrypt(plainText []byte) (string, string, error) {
 	return EncryptWithKey(plainText, PublicKey)
 }
 
-// Decrypt decrypts using Hybrid Decryption (RSA-OAEP + AES-256-GCM) with the package-level PrivateKey.
+// Decrypt decrypts using Hybrid Decryption (RSA-OAEP + AES-256-GCM) with the package-level PrivateKey,
+// falling back to keys in PrivateKeyRing if primary decryption fails.
 func Decrypt(cipherTextBase64 string, nonceBase64 string) ([]byte, error) {
 	if PrivateKey == nil {
 		return nil, fmt.Errorf("private key not configured")
 	}
-	return DecryptWithKey(cipherTextBase64, nonceBase64, PrivateKey)
+
+	// Try decrypting with primary PrivateKey first
+	plainBytes, err := DecryptWithKey(cipherTextBase64, nonceBase64, PrivateKey)
+	if err == nil {
+		return plainBytes, nil
+	}
+
+	// Fallback to legacy keys in key ring
+	for _, key := range PrivateKeyRing {
+		plainBytes, err = DecryptWithKey(cipherTextBase64, nonceBase64, key)
+		if err == nil {
+			return plainBytes, nil
+		}
+	}
+
+	return nil, fmt.Errorf("decryption failed: %w", err)
 }
 
 // EncryptWithKey performs hybrid encryption:

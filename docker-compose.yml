@@ -44,5 +44,17 @@ services:
     depends_on:
       - backend
 
+  nginx:
+    build:
+      context: ./nginx
+    container_name: secret-vault-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+      - backend
+
 volumes:
   postgres_data:
+

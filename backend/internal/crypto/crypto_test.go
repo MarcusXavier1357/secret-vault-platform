@@ -69,3 +69,53 @@ func TestTamperedCiphertext(t *testing.T) {
 	}
 }
 
+func TestKeyRingRotation(t *testing.T) {
+	// Generate old key
+	oldPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate old key: %v", err)
+	}
+	oldPub := &oldPriv.PublicKey
+
+	// Generate new key
+	newPriv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("failed to generate new key: %v", err)
+	}
+
+	originalText := []byte("rotated-secret-data")
+
+	// Encrypt using old key
+	cipherText, nonce, err := EncryptWithKey(originalText, oldPub)
+	if err != nil {
+		t.Fatalf("EncryptWithKey failed: %v", err)
+	}
+
+	// Set package state: primary is new key, old key is in ring
+	oldPrimaryPub := PublicKey
+	oldPrimaryPriv := PrivateKey
+	oldRing := PrivateKeyRing
+
+	PublicKey = &newPriv.PublicKey
+	PrivateKey = newPriv
+	PrivateKeyRing = []*rsa.PrivateKey{oldPriv}
+
+	// Clean up after test
+	defer func() {
+		PublicKey = oldPrimaryPub
+		PrivateKey = oldPrimaryPriv
+		PrivateKeyRing = oldRing
+	}()
+
+	// Decrypt should fallback to oldPriv in PrivateKeyRing and succeed
+	decrypted, err := Decrypt(cipherText, nonce)
+	if err != nil {
+		t.Fatalf("Decrypt with key ring failed: %v", err)
+	}
+
+	if !bytes.Equal(originalText, decrypted) {
+		t.Errorf("Expected decrypted text to match. Got %s, want %s", string(decrypted), string(originalText))
+	}
+}
+
+
