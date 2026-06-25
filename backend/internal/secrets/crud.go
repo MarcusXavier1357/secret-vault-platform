@@ -18,36 +18,36 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateSecretRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		sendJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" || !nameRegex.MatchString(req.Name) {
-		http.Error(w, "Invalid secret name. Must be uppercase alphanumeric and underscores (e.g. JWT_SECRET)", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret name. Must be uppercase alphanumeric and underscores (e.g. JWT_SECRET)", http.StatusBadRequest)
 		return
 	}
 
 	req.Value = strings.TrimSpace(req.Value)
 	if req.Value == "" {
-		http.Error(w, "Secret value cannot be empty", http.StatusBadRequest)
+		sendJSONError(w, "Secret value cannot be empty", http.StatusBadRequest)
 		return
 	}
 
 	if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now()) {
-		http.Error(w, "Expiration date must be in the future", http.StatusBadRequest)
+		sendJSONError(w, "Expiration date must be in the future", http.StatusBadRequest)
 		return
 	}
 
 	encVal, nonce, err := crypto.Encrypt([]byte(req.Value))
 	if err != nil {
-		http.Error(w, "Failed to encrypt secret", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to encrypt secret", http.StatusInternalServerError)
 		return
 	}
 
 	tx, err := DB.Begin()
 	if err != nil {
-		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
 
@@ -69,10 +69,10 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		tx.Rollback()
 		if strings.Contains(err.Error(), "unique constraint") || strings.Contains(err.Error(), "duplicate key") {
-			http.Error(w, "Secret name already exists", http.StatusConflict)
+			sendJSONError(w, "Secret name already exists", http.StatusConflict)
 			return
 		}
-		http.Error(w, "Failed to create secret metadata: "+err.Error(), http.StatusInternalServerError)
+		sendJSONError(w, "Failed to create secret metadata: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -83,7 +83,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to store secret value", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to store secret value", http.StatusInternalServerError)
 		return
 	}
 
@@ -93,13 +93,13 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to associate current version ID", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to associate current version ID", http.StatusInternalServerError)
 		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		http.Error(w, "Transaction commit failed", http.StatusInternalServerError)
+		sendJSONError(w, "Transaction commit failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -127,7 +127,7 @@ func ListSecretsHandler(w http.ResponseWriter, r *http.Request) {
 		ORDER BY s.name ASC
 	`)
 	if err != nil {
-		http.Error(w, "Failed to query secrets", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to query secrets", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -137,7 +137,7 @@ func ListSecretsHandler(w http.ResponseWriter, r *http.Request) {
 		var s SecretResponse
 		err := rows.Scan(&s.ID, &s.Name, &s.Description, &s.Status, &s.ExpiresAt, &s.CreatedAt, &s.UpdatedAt, &s.Version)
 		if err != nil {
-			http.Error(w, "Failed to scan row", http.StatusInternalServerError)
+			sendJSONError(w, "Failed to scan row", http.StatusInternalServerError)
 			return
 		}
 
@@ -155,7 +155,7 @@ func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	secretID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid secret ID format", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret ID format", http.StatusBadRequest)
 		return
 	}
 
@@ -170,10 +170,10 @@ func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, secretID).Scan(&s.ID, &s.Name, &s.Description, &s.Status, &s.ExpiresAt, &s.CreatedAt, &s.UpdatedAt, &s.Version, &encryptedVal, &nonce)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Secret not found", http.StatusNotFound)
+		sendJSONError(w, "Secret not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
@@ -182,7 +182,7 @@ func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
 	if s.Status == "ACTIVE" {
 		plainBytes, err := crypto.Decrypt(encryptedVal, nonce)
 		if err != nil {
-			http.Error(w, "Failed to decrypt secret value", http.StatusInternalServerError)
+			sendJSONError(w, "Failed to decrypt secret value", http.StatusInternalServerError)
 			return
 		}
 		s.Value = string(plainBytes)
@@ -199,25 +199,25 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	secretID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid secret ID format", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret ID format", http.StatusBadRequest)
 		return
 	}
 
 	var req UpdateSecretRequest
 	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		sendJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	req.Value = strings.TrimSpace(req.Value)
 	if req.Value == "" {
-		http.Error(w, "Secret value cannot be empty", http.StatusBadRequest)
+		sendJSONError(w, "Secret value cannot be empty", http.StatusBadRequest)
 		return
 	}
 
 	if req.ExpiresAt != nil && req.ExpiresAt.Before(time.Now()) {
-		http.Error(w, "Expiration date must be in the future", http.StatusBadRequest)
+		sendJSONError(w, "Expiration date must be in the future", http.StatusBadRequest)
 		return
 	}
 
@@ -234,29 +234,29 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, secretID).Scan(&currentStatus, &currentExpiresAt, &secretName, &latestVersion)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Secret not found", http.StatusNotFound)
+		sendJSONError(w, "Secret not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	currentStatus = checkAndUpdateExpiration(secretID, currentExpiresAt, currentStatus)
 
 	if currentStatus == "REVOKED" {
-		http.Error(w, "Revoked secrets cannot be updated", http.StatusUnprocessableEntity)
+		sendJSONError(w, "Revoked secrets cannot be updated", http.StatusUnprocessableEntity)
 		return
 	}
 
 	encVal, nonce, err := crypto.Encrypt([]byte(req.Value))
 	if err != nil {
-		http.Error(w, "Failed to encrypt secret", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to encrypt secret", http.StatusInternalServerError)
 		return
 	}
 
 	tx, err := DB.Begin()
 	if err != nil {
-		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
 
@@ -275,7 +275,7 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, newVersionID, secretID, newVersionNumber, encVal, nonce, now)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to store new secret version", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to store new secret version", http.StatusInternalServerError)
 		return
 	}
 
@@ -286,13 +286,13 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, req.Description, status, req.ExpiresAt, newVersionID, now, secretID)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to update secret metadata", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to update secret metadata", http.StatusInternalServerError)
 		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		http.Error(w, "Transaction commit failed", http.StatusInternalServerError)
+		sendJSONError(w, "Transaction commit failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -316,24 +316,24 @@ func RevokeSecretHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	secretID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid secret ID format", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret ID format", http.StatusBadRequest)
 		return
 	}
 
 	var secretName string
 	err = DB.QueryRow("SELECT name FROM secrets WHERE id = $1", secretID).Scan(&secretName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "Secret not found", http.StatusNotFound)
+		sendJSONError(w, "Secret not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	now := time.Now()
 	_, err = DB.Exec("UPDATE secrets SET status = 'REVOKED', updated_at = $1 WHERE id = $2", now, secretID)
 	if err != nil {
-		http.Error(w, "Failed to revoke secret", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to revoke secret", http.StatusInternalServerError)
 		return
 	}
 

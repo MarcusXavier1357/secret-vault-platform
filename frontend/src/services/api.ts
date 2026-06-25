@@ -19,7 +19,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     let errorMessage = 'An error occurred';
     try {
       const errData = await response.json();
-      errorMessage = errData.message || errorMessage;
+      errorMessage = errData.error || errData.message || errorMessage;
     } catch {
       try {
         errorMessage = await response.text();

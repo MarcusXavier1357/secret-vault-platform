@@ -1,0 +1,96 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: vault_user
+          POSTGRES_PASSWORD: vault_password
+          POSTGRES_DB: secret_vault
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify Go dependencies
+        run: |
+          cd backend
+          go mod verify
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.5
+          working-directory: backend
+          args: --timeout=5m
+
+      - name: Run Backend Tests
+        run: |
+          cd backend
+          go test ./... -v
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: vault_user
+          DB_PASSWORD: vault_password
+          DB_NAME: secret_vault
+          DB_SSLMODE: disable
+
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run Linter
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run Frontend Tests
+        run: |
+          cd frontend
+          npm run test
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm run build

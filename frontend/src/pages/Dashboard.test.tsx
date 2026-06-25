@@ -78,4 +78,16 @@ describe('Dashboard Component', () => {
     expect(screen.getByText('Logs de Auditoria')).toBeInTheDocument();
     expect(screen.getByText('CREATE_SECRET')).toBeInTheDocument();
   });
+
+  it('renders error notification when API fails', async () => {
+    // Mock API query failures
+    vi.mocked(api.apiFetch).mockRejectedValue(new Error('Falha na comunicação'));
+
+    render(<Dashboard username="admin" onLogout={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Falha na comunicação')).toBeInTheDocument();
+    });
+  });
 });
+

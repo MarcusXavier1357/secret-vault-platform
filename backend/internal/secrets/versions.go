@@ -18,14 +18,14 @@ func ListSecretVersionsHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	secretID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid secret ID format", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret ID format", http.StatusBadRequest)
 		return
 	}
 
 	var exists bool
 	err = DB.QueryRow("SELECT EXISTS(SELECT 1 FROM secrets WHERE id = $1)", secretID).Scan(&exists)
 	if err != nil || !exists {
-		http.Error(w, "Secret not found", http.StatusNotFound)
+		sendJSONError(w, "Secret not found", http.StatusNotFound)
 		return
 	}
 
@@ -36,7 +36,7 @@ func ListSecretVersionsHandler(w http.ResponseWriter, r *http.Request) {
 		ORDER BY version DESC
 	`, secretID)
 	if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -52,7 +52,7 @@ func ListSecretVersionsHandler(w http.ResponseWriter, r *http.Request) {
 		var v VersionMeta
 		err := rows.Scan(&v.ID, &v.Version, &v.CreatedAt)
 		if err != nil {
-			http.Error(w, "Database scan error", http.StatusInternalServerError)
+			sendJSONError(w, "Database scan error", http.StatusInternalServerError)
 			return
 		}
 		versions = append(versions, v)
@@ -67,14 +67,14 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	secretID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid secret ID format", http.StatusBadRequest)
+		sendJSONError(w, "Invalid secret ID format", http.StatusBadRequest)
 		return
 	}
 
 	versionStr := chi.URLParam(r, "version")
 	targetVersion, err := strconv.Atoi(versionStr)
 	if err != nil {
-		http.Error(w, "Invalid version", http.StatusBadRequest)
+		sendJSONError(w, "Invalid version", http.StatusBadRequest)
 		return
 	}
 
@@ -90,17 +90,17 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, secretID).Scan(&secretName, &currentStatus, &currentExpiresAt, &latestVersion)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Secret not found", http.StatusNotFound)
+		sendJSONError(w, "Secret not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	currentStatus = checkAndUpdateExpiration(secretID, currentExpiresAt, currentStatus)
 
 	if currentStatus == "REVOKED" {
-		http.Error(w, "Revoked secrets cannot be rolled back", http.StatusUnprocessableEntity)
+		sendJSONError(w, "Revoked secrets cannot be rolled back", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -112,16 +112,16 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, secretID, targetVersion).Scan(&encryptedVal, &nonce)
 
 	if err == sql.ErrNoRows {
-		http.Error(w, "Target version not found", http.StatusNotFound)
+		sendJSONError(w, "Target version not found", http.StatusNotFound)
 		return
 	} else if err != nil {
-		http.Error(w, "Database error", http.StatusInternalServerError)
+		sendJSONError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	tx, err := DB.Begin()
 	if err != nil {
-		http.Error(w, "Transaction start failed", http.StatusInternalServerError)
+		sendJSONError(w, "Transaction start failed", http.StatusInternalServerError)
 		return
 	}
 
@@ -140,7 +140,7 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, newVersionID, secretID, newVersionNumber, encryptedVal, nonce, now)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to copy target version content", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to copy target version content", http.StatusInternalServerError)
 		return
 	}
 
@@ -151,13 +151,13 @@ func RollbackSecretHandler(w http.ResponseWriter, r *http.Request) {
 	`, status, newVersionID, now, secretID)
 	if err != nil {
 		tx.Rollback()
-		http.Error(w, "Failed to update secret current version", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to update secret current version", http.StatusInternalServerError)
 		return
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
+		sendJSONError(w, "Failed to commit transaction", http.StatusInternalServerError)
 		return
 	}
 

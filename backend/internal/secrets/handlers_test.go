@@ -1,6 +1,11 @@
 package secrets
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,3 +62,84 @@ func TestCheckAndUpdateExpiration(t *testing.T) {
 		t.Errorf("Expected status to become EXPIRED, got %s", status)
 	}
 }
+
+func TestCreateSecretPayloadValidation(t *testing.T) {
+	t.Run("Invalid JSON Payload", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/api/secrets", bytes.NewBuffer([]byte("{invalid-json")))
+		rr := httptest.NewRecorder()
+		CreateSecretHandler(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rr.Code)
+		}
+
+		var resp map[string]string
+		json.Unmarshal(rr.Body.Bytes(), &resp)
+		if resp["error"] != "Invalid request payload" {
+			t.Errorf("expected error 'Invalid request payload', got '%s'", resp["error"])
+		}
+	})
+
+	t.Run("Invalid Name Format", func(t *testing.T) {
+		payload, _ := json.Marshal(CreateSecretRequest{
+			Name:  "invalid-name",
+			Value: "my-secret",
+		})
+		req, _ := http.NewRequest("POST", "/api/secrets", bytes.NewBuffer(payload))
+		rr := httptest.NewRecorder()
+		CreateSecretHandler(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rr.Code)
+		}
+
+		var resp map[string]string
+		json.Unmarshal(rr.Body.Bytes(), &resp)
+		if !strings.Contains(resp["error"], "Must be uppercase alphanumeric") {
+			t.Errorf("expected validation message, got '%s'", resp["error"])
+		}
+	})
+
+	t.Run("Empty Value", func(t *testing.T) {
+		payload, _ := json.Marshal(CreateSecretRequest{
+			Name:  "VALID_NAME",
+			Value: "",
+		})
+		req, _ := http.NewRequest("POST", "/api/secrets", bytes.NewBuffer(payload))
+		rr := httptest.NewRecorder()
+		CreateSecretHandler(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rr.Code)
+		}
+
+		var resp map[string]string
+		json.Unmarshal(rr.Body.Bytes(), &resp)
+		if resp["error"] != "Secret value cannot be empty" {
+			t.Errorf("expected error 'Secret value cannot be empty', got '%s'", resp["error"])
+		}
+	})
+
+	t.Run("Expiration In Past", func(t *testing.T) {
+		pastDate := time.Now().Add(-10 * time.Minute)
+		payload, _ := json.Marshal(CreateSecretRequest{
+			Name:      "VALID_NAME",
+			Value:     "secret-value",
+			ExpiresAt: &pastDate,
+		})
+		req, _ := http.NewRequest("POST", "/api/secrets", bytes.NewBuffer(payload))
+		rr := httptest.NewRecorder()
+		CreateSecretHandler(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rr.Code)
+		}
+
+		var resp map[string]string
+		json.Unmarshal(rr.Body.Bytes(), &resp)
+		if resp["error"] != "Expiration date must be in the future" {
+			t.Errorf("expected error 'Expiration date must be in the future', got '%s'", resp["error"])
+		}
+	})
+}
+

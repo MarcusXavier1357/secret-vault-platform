@@ -241,9 +241,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         
         {/* Error notification */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start gap-2 text-sm">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{error}</span>
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start justify-between gap-2 text-sm">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{error}</span>
+            </div>
+            <button onClick={() => setError('')} className="text-red-400 hover:text-red-300 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
