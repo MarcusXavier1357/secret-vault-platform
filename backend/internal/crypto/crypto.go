@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -100,7 +101,28 @@ func Encrypt(plainText []byte) (string, string, error) {
 
 // Decrypt decrypts using Hybrid Decryption (RSA-OAEP + AES-256-GCM) with the package-level PrivateKey,
 // falling back to keys in PrivateKeyRing if primary decryption fails.
+// If the payload format does not contain '.', it falls back to old symmetric AES-256-GCM decryption.
 func Decrypt(cipherTextBase64 string, nonceBase64 string) ([]byte, error) {
+	parts := strings.Split(cipherTextBase64, ".")
+	if len(parts) != 2 {
+		// Fallback para descriptografia simétrica antiga se ENCRYPTION_KEY estiver configurado
+		oldKeyHex := os.Getenv("ENCRYPTION_KEY")
+		if oldKeyHex != "" {
+			var keyBytes []byte
+			if len(oldKeyHex) == 32 {
+				keyBytes = []byte(oldKeyHex)
+			} else {
+				var err error
+				keyBytes, err = hex.DecodeString(oldKeyHex)
+				if err != nil {
+					return nil, fmt.Errorf("invalid format and failed to decode ENCRYPTION_KEY: %w", err)
+				}
+			}
+			return decryptSymmetric(cipherTextBase64, nonceBase64, keyBytes)
+		}
+		return nil, fmt.Errorf("invalid encrypted value format, expected '<encDEK>.<ciphertext>'")
+	}
+
 	if PrivateKey == nil {
 		return nil, fmt.Errorf("private key not configured")
 	}
@@ -121,6 +143,44 @@ func Decrypt(cipherTextBase64 string, nonceBase64 string) ([]byte, error) {
 
 	return nil, fmt.Errorf("decryption failed: %w", err)
 }
+
+func decryptSymmetric(cipherTextBase64 string, nonceBase64 string, key []byte) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, fmt.Errorf("symmetric decryption key must be exactly 32 bytes")
+	}
+
+	cipherText, err := base64.StdEncoding.DecodeString(cipherTextBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode ciphertext: %w", err)
+	}
+
+	nonce, err := base64.StdEncoding.DecodeString(nonceBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode nonce: %w", err)
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	if len(nonce) != aesgcm.NonceSize() {
+		return nil, fmt.Errorf("invalid nonce size")
+	}
+
+	plainText, err := aesgcm.Open(nil, nonce, cipherText, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt: %w", err)
+	}
+
+	return plainText, nil
+}
+
 
 // EncryptWithKey performs hybrid encryption:
 // 1. Generates ephemeral 32-byte AES key (DEK).
