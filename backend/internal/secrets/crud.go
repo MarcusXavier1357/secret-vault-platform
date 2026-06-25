@@ -39,13 +39,7 @@ func CreateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := getEncryptionKey()
-	if err != nil {
-		http.Error(w, "Encryption configuration error", http.StatusInternalServerError)
-		return
-	}
-
-	encVal, nonce, err := crypto.Encrypt([]byte(req.Value), key)
+	encVal, nonce, err := crypto.Encrypt([]byte(req.Value))
 	if err != nil {
 		http.Error(w, "Failed to encrypt secret", http.StatusInternalServerError)
 		return
@@ -186,13 +180,7 @@ func GetSecretHandler(w http.ResponseWriter, r *http.Request) {
 	s.Status = checkAndUpdateExpiration(s.ID, s.ExpiresAt, s.Status)
 
 	if s.Status == "ACTIVE" {
-		key, err := getEncryptionKey()
-		if err != nil {
-			http.Error(w, "Encryption configuration error", http.StatusInternalServerError)
-			return
-		}
-
-		plainBytes, err := crypto.Decrypt(encryptedVal, nonce, key)
+		plainBytes, err := crypto.Decrypt(encryptedVal, nonce)
 		if err != nil {
 			http.Error(w, "Failed to decrypt secret value", http.StatusInternalServerError)
 			return
@@ -260,13 +248,7 @@ func UpdateSecretHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := getEncryptionKey()
-	if err != nil {
-		http.Error(w, "Encryption configuration error", http.StatusInternalServerError)
-		return
-	}
-
-	encVal, nonce, err := crypto.Encrypt([]byte(req.Value), key)
+	encVal, nonce, err := crypto.Encrypt([]byte(req.Value))
 	if err != nil {
 		http.Error(w, "Failed to encrypt secret", http.StatusInternalServerError)
 		return

@@ -4,21 +4,101 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
+	"os"
+	"strings"
 )
 
-// Encrypt encrypts plainText using AES-256-GCM with the provided 32-byte key.
-// Returns base64-encoded ciphertext and nonce.
-func Encrypt(plainText []byte, key []byte) (string, string, error) {
-	if len(key) != 32 {
-		return "", "", fmt.Errorf("encryption key must be exactly 32 bytes (got %d)", len(key))
+var (
+	// PublicKey is used for encryption (writes)
+	PublicKey *rsa.PublicKey
+	// PrivateKey is used for decryption (reads)
+	PrivateKey *rsa.PrivateKey
+)
+
+func init() {
+	// 1. Try loading keys from environment variables
+	pubPem := os.Getenv("RSA_PUBLIC_KEY")
+	privPem := os.Getenv("RSA_PRIVATE_KEY")
+
+	if pubPem != "" {
+		block, _ := pem.Decode([]byte(pubPem))
+		if block != nil {
+			pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+			if err == nil {
+				if rsaPub, ok := pub.(*rsa.PublicKey); ok {
+					PublicKey = rsaPub
+				}
+			}
+		}
 	}
 
-	block, err := aes.NewCipher(key)
+	if privPem != "" {
+		block, _ := pem.Decode([]byte(privPem))
+		if block != nil {
+			priv, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err != nil {
+				priv, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			}
+			if err == nil {
+				if rsaPriv, ok := priv.(*rsa.PrivateKey); ok {
+					PrivateKey = rsaPriv
+				}
+			}
+		}
+	}
+
+	// 2. Fallback to generating keys for development/testing if none provided
+	if PublicKey == nil || PrivateKey == nil {
+		log.Println("WARNING: RSA keys not fully configured in env. Generating transient 2048-bit keys for dev/test.")
+		priv, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			log.Fatalf("Failed to generate fallback RSA keys: %v", err)
+		}
+		PrivateKey = priv
+		PublicKey = &priv.PublicKey
+	}
+}
+
+// Encrypt encrypts plainText using Hybrid Encryption (RSA-OAEP + AES-256-GCM) with the package-level PublicKey.
+func Encrypt(plainText []byte) (string, string, error) {
+	if PublicKey == nil {
+		return "", "", fmt.Errorf("public key not configured")
+	}
+	return EncryptWithKey(plainText, PublicKey)
+}
+
+// Decrypt decrypts using Hybrid Decryption (RSA-OAEP + AES-256-GCM) with the package-level PrivateKey.
+func Decrypt(cipherTextBase64 string, nonceBase64 string) ([]byte, error) {
+	if PrivateKey == nil {
+		return nil, fmt.Errorf("private key not configured")
+	}
+	return DecryptWithKey(cipherTextBase64, nonceBase64, PrivateKey)
+}
+
+// EncryptWithKey performs hybrid encryption:
+// 1. Generates ephemeral 32-byte AES key (DEK).
+// 2. Encrypts plaintext using AES-256-GCM.
+// 3. Encrypts DEK using RSA-OAEP with pubKey.
+// Returns base64(encryptedDEK) + "." + base64(ciphertext) and base64(nonce).
+func EncryptWithKey(plainText []byte, pubKey *rsa.PublicKey) (string, string, error) {
+	// 1. Generate ephemeral DEK (Data Encryption Key)
+	dek := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, dek); err != nil {
+		return "", "", fmt.Errorf("failed to generate ephemeral key: %w", err)
+	}
+
+	// 2. Encrypt payload with AES-256-GCM
+	block, err := aes.NewCipher(dek)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create cipher: %w", err)
+		return "", "", fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
@@ -31,21 +111,37 @@ func Encrypt(plainText []byte, key []byte) (string, string, error) {
 		return "", "", fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	cipherText := aesgcm.Seal(nil, nonce, plainText, nil)
+	ciphertext := aesgcm.Seal(nil, nonce, plainText, nil)
 
-	cipherTextBase64 := base64.StdEncoding.EncodeToString(cipherText)
-	nonceBase64 := base64.StdEncoding.EncodeToString(nonce)
-
-	return cipherTextBase64, nonceBase64, nil
-}
-
-// Decrypt decrypts the base64-encoded cipherText using the base64-encoded nonce and the 32-byte key.
-func Decrypt(cipherTextBase64 string, nonceBase64 string, key []byte) ([]byte, error) {
-	if len(key) != 32 {
-		return nil, fmt.Errorf("decryption key must be exactly 32 bytes")
+	// 3. Encrypt DEK with RSA Public Key
+	encryptedDEK, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, dek, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to encrypt DEK with RSA: %w", err)
 	}
 
-	cipherText, err := base64.StdEncoding.DecodeString(cipherTextBase64)
+	// 4. Format outputs
+	encryptedValue := base64.StdEncoding.EncodeToString(encryptedDEK) + "." + base64.StdEncoding.EncodeToString(ciphertext)
+	nonceBase64 := base64.StdEncoding.EncodeToString(nonce)
+
+	return encryptedValue, nonceBase64, nil
+}
+
+// DecryptWithKey decrypts hybrid ciphertext:
+// 1. Splits payload to extract encrypted DEK and AES ciphertext.
+// 2. Decrypts DEK using RSA Private Key.
+// 3. Decrypts AES ciphertext using DEK and nonce.
+func DecryptWithKey(encryptedValue string, nonceBase64 string, privKey *rsa.PrivateKey) ([]byte, error) {
+	parts := strings.Split(encryptedValue, ".")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid encrypted value format, expected '<encDEK>.<ciphertext>'")
+	}
+
+	encryptedDEK, err := base64.StdEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode encrypted DEK: %w", err)
+	}
+
+	ciphertext, err := base64.StdEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode ciphertext: %w", err)
 	}
@@ -55,9 +151,16 @@ func Decrypt(cipherTextBase64 string, nonceBase64 string, key []byte) ([]byte, e
 		return nil, fmt.Errorf("failed to decode nonce: %w", err)
 	}
 
-	block, err := aes.NewCipher(key)
+	// 1. Decrypt DEK using RSA Private Key
+	dek, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privKey, encryptedDEK, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
+		return nil, fmt.Errorf("failed to decrypt DEK with RSA: %w", err)
+	}
+
+	// 2. Decrypt ciphertext using AES-256-GCM
+	block, err := aes.NewCipher(dek)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
@@ -69,9 +172,9 @@ func Decrypt(cipherTextBase64 string, nonceBase64 string, key []byte) ([]byte, e
 		return nil, fmt.Errorf("invalid nonce size")
 	}
 
-	plainText, err := aesgcm.Open(nil, nonce, cipherText, nil)
+	plainText, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt: %w", err)
+		return nil, fmt.Errorf("failed to decrypt ciphertext: %w", err)
 	}
 
 	return plainText, nil
