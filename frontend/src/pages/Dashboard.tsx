@@ -218,7 +218,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const expiredSecrets = secrets.filter(s => s.status === 'EXPIRED').length;
 
   return (
-    <div className="min-h-screen bg-[#030305] text-[#e2e8f0] font-cyber-sans flex flex-col antialiased crt-screen">
+    <div className="h-screen bg-[#030305] text-[#e2e8f0] font-cyber-sans flex flex-col antialiased crt-screen overflow-hidden">
       {/* Dynamic top static accents */}
       <div className="h-1 bg-amber-500 w-full" />
       
@@ -255,7 +255,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-4 min-h-0 overflow-hidden">
         
         {/* Error notification */}
         {error && (
@@ -295,10 +295,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </section>
 
         {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Secrets List Table (2/3 width) */}
-          <div className="lg:col-span-2 bg-[#09090f] border-2 border-slate-900 shadow-2xl flex flex-col relative">
+          <div className="lg:col-span-2 bg-[#09090f] border-2 border-slate-900 shadow-2xl flex flex-col relative min-h-0">
             {/* Corner accents */}
             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-slate-700" />
             <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-slate-700" />
@@ -328,7 +328,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <span>O cofre de segredos está vazio. Nenhum registro ativo.</span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="flex-1 overflow-y-auto min-h-0">
                 <table className="min-w-full divide-y-2 divide-slate-950 text-left text-xs font-cyber-mono">
                   <thead className="bg-[#040407] text-slate-400 uppercase tracking-wider">
                     <tr>
@@ -406,7 +406,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           </div>
 
           {/* Live Audit Logs Panel (1/3 width) */}
-          <div className="bg-[#09090f] border-2 border-slate-900 p-5 shadow-2xl flex flex-col gap-4 relative">
+          <div className="bg-[#09090f] border-2 border-slate-900 p-5 shadow-2xl flex flex-col gap-4 relative min-h-0">
             <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-slate-700" />
             
             <div>
@@ -419,7 +419,7 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
               </p>
             </div>
             
-            <div className="border-t border-slate-900 pt-4 flex-1 overflow-y-auto max-h-[450px] pr-1">
+            <div className="border-t border-slate-900 pt-4 flex-1 overflow-y-auto pr-1">
               {auditLogs.length === 0 ? (
                 <div className="text-[10px] font-cyber-mono text-slate-650 text-center py-6">// sem logs registrados</div>
               ) : (
