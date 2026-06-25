@@ -16,9 +16,9 @@ describe('Login Component', () => {
   it('renders login form properly', () => {
     render(<Login onLoginSuccess={() => {}} />);
     
-    expect(screen.getByLabelText(/usuário/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /entrar no vault/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/nome_do_operador/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/senha_de_acesso/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /INICIAR CONEXÃO DO SISTEMA/i })).toBeInTheDocument();
   });
 
   it('shows error message on failed login request', async () => {
@@ -27,10 +27,10 @@ describe('Login Component', () => {
 
     render(<Login onLoginSuccess={() => {}} />);
     
-    fireEvent.change(screen.getByLabelText(/usuário/i), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByLabelText(/senha/i), { target: { value: 'wrongpass' } });
+    fireEvent.change(screen.getByLabelText(/nome_do_operador/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText(/senha_de_acesso/i), { target: { value: 'wrongpass' } });
     
-    fireEvent.click(screen.getByRole('button', { name: /entrar no vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /INICIAR CONEXÃO DO SISTEMA/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
@@ -44,13 +44,14 @@ describe('Login Component', () => {
 
     render(<Login onLoginSuccess={handleSuccess} />);
     
-    fireEvent.change(screen.getByLabelText(/usuário/i), { target: { value: 'admin' } });
-    fireEvent.change(screen.getByLabelText(/senha/i), { target: { value: 'senha_forte' } });
+    fireEvent.change(screen.getByLabelText(/nome_do_operador/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText(/senha_de_acesso/i), { target: { value: 'senha_forte' } });
     
-    fireEvent.click(screen.getByRole('button', { name: /entrar no vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /INICIAR CONEXÃO DO SISTEMA/i }));
 
     await waitFor(() => {
       expect(handleSuccess).toHaveBeenCalledTimes(1);
     });
   });
 });
+

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '../services/api';
 import { 
   LogOut, Shield, AlertCircle, Plus, Eye, Trash2, 
-  RefreshCw, CheckCircle2, AlertTriangle, X, History, FileText, Lock
+  RefreshCw, X, History, FileText, Lock, Terminal
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -152,7 +152,14 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         body: JSON.stringify(payload)
       });
 
+      // Clear form
+      setEditDesc('');
+      setEditValue('');
+      setEditExpires('');
+      setSelectedSecretId(null);
       setShowEditModal(false);
+
+      // Refresh list
       fetchSecrets();
       fetchAuditLogs();
     } catch (err: any) {
@@ -162,34 +169,36 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
 
   // Revoke handler
   const handleRevokeSecret = async (id: string) => {
-    if (!confirm('Deseja realmente revogar este segredo? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Deseja revogar permanentemente este segredo?')) return;
+    setError('');
     try {
       await apiFetch(`/api/secrets/${id}/revoke`, { method: 'POST' });
       fetchSecrets();
       fetchAuditLogs();
     } catch (err: any) {
-      alert(err.message || 'Erro ao revogar segredo.');
+      setError(err.message || 'Erro ao revogar segredo.');
     }
   };
 
-  // Versioning handlers
+  // Version List handler
   const handleOpenVersions = async (secret: SecretItem) => {
     setSelectedSecretId(secret.id);
     setViewSecretName(secret.name);
-    setViewSecretVersion(secret.version);
     setSecretVersions([]);
     setShowVersionsModal(true);
     try {
       const data = await apiFetch(`/api/secrets/${secret.id}/versions`);
       setSecretVersions(data);
     } catch (err: any) {
-      setError(err.message || 'Erro ao buscar versões.');
+      setError(err.message || 'Erro ao listar versões.');
     }
   };
 
+  // Rollback handler
   const handleRollback = async (version: number) => {
     if (!selectedSecretId) return;
-    if (!confirm(`Deseja restaurar para a versão v${version}? Isso criará uma nova versão no histórico.`)) return;
+    if (!confirm(`Deseja restaurar para a versão v${version}?`)) return;
+    setError('');
     try {
       await apiFetch(`/api/secrets/${selectedSecretId}/versions/${version}/rollback`, {
         method: 'POST'
@@ -209,28 +218,37 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
   const expiredSecrets = secrets.filter(s => s.status === 'EXPIRED').length;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col antialiased">
+    <div className="min-h-screen bg-[#030305] text-[#e2e8f0] font-cyber-sans flex flex-col antialiased crt-screen">
+      {/* Dynamic top static accents */}
+      <div className="h-1 bg-amber-500 w-full" />
+      
       {/* Top Header */}
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b-2 border-slate-900 bg-[#07070a]/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-emerald-500/10 p-1.5 rounded-lg border border-emerald-500/20">
-              <Shield className="w-6 h-6 text-emerald-500" />
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-500/5 p-2 border border-amber-500/30">
+              <Shield className="w-5 h-5 text-amber-500 text-glow-amber" />
             </div>
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              Secret Vault
-            </span>
+            <div>
+              <span className="font-bold text-base tracking-widest font-cyber-mono text-glow-amber uppercase text-white">
+                SECRET VAULT
+              </span>
+              <span className="text-[10px] text-slate-500 font-cyber-mono ml-2 hidden md:inline">
+                // CONEXAO_SEGURA: SIM
+              </span>
+            </div>
           </div>
+          
           <div className="flex items-center gap-4">
-            <span className="text-slate-400 text-xs hidden sm:inline">
-              Operador: <strong className="text-white">{username}</strong>
+            <span className="text-slate-400 text-xs font-cyber-mono uppercase tracking-wider hidden sm:inline">
+              operador: <strong className="text-white text-glow-amber">{username}</strong>
             </span>
             <button
               onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-800 rounded-lg hover:bg-slate-900 hover:text-red-400 text-xs transition duration-150 ease-in-out cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/30 bg-red-500/5 hover:bg-red-500 hover:text-slate-950 text-red-400 font-cyber-mono text-xs uppercase tracking-widest transition duration-150 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
-              Sair
+              Desconectar
             </button>
           </div>
         </div>
@@ -241,10 +259,10 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         
         {/* Error notification */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl flex items-start justify-between gap-2 text-sm">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <span>{error}</span>
+          <div className="bg-red-500/5 border-2 border-red-500/30 text-red-400 p-4 flex items-start justify-between gap-2 text-xs font-cyber-mono uppercase tracking-wider">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>[SYSTEM_ALERT] {error}</span>
             </div>
             <button onClick={() => setError('')} className="text-red-400 hover:text-red-300 cursor-pointer">
               <X className="w-4 h-4" />
@@ -252,23 +270,27 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           </div>
         )}
 
-        {/* Dashboard Metrics (Fase 9 layout base) */}
+        {/* Dashboard Metrics (Brutalist high-contrast boxes) */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-850 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs text-slate-400 font-medium">Total de Segredos</span>
-            <span className="text-2xl font-bold text-white mt-1">{totalSecrets}</span>
+          <div className="bg-[#09090f] border-2 border-slate-900 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex flex-col justify-between relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-slate-700" />
+            <span className="text-[10px] text-slate-500 font-cyber-mono uppercase tracking-widest">// total_de_segredos</span>
+            <span className="text-3xl font-extrabold text-white mt-2 font-cyber-mono">{(totalSecrets.toString()).padStart(3, '0')}</span>
           </div>
-          <div className="bg-slate-900 border border-slate-850 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs text-emerald-400 font-medium">Ativos</span>
-            <span className="text-2xl font-bold text-emerald-400 mt-1">{activeSecrets}</span>
+          <div className="bg-[#09090f] border-2 border-slate-900 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex flex-col justify-between relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-emerald-500/50" />
+            <span className="text-[10px] text-emerald-500 font-cyber-mono uppercase tracking-widest">// status_ativo</span>
+            <span className="text-3xl font-extrabold text-emerald-400 mt-2 font-cyber-mono text-glow-green">{(activeSecrets.toString()).padStart(3, '0')}</span>
           </div>
-          <div className="bg-slate-900 border border-slate-850 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs text-red-400 font-medium">Revogados</span>
-            <span className="text-2xl font-bold text-red-400 mt-1">{revokedSecrets}</span>
+          <div className="bg-[#09090f] border-2 border-slate-900 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex flex-col justify-between relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-red-500/50" />
+            <span className="text-[10px] text-red-500 font-cyber-mono uppercase tracking-widest">// status_revogado</span>
+            <span className="text-3xl font-extrabold text-red-400 mt-2 font-cyber-mono">{(revokedSecrets.toString()).padStart(3, '0')}</span>
           </div>
-          <div className="bg-slate-900 border border-slate-850 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-xs text-amber-400 font-medium">Expirados</span>
-            <span className="text-2xl font-bold text-amber-400 mt-1">{expiredSecrets}</span>
+          <div className="bg-[#09090f] border-2 border-slate-900 p-4 shadow-[0_4px_12px_rgba(0,0,0,0.5)] flex flex-col justify-between relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-amber-500/50" />
+            <span className="text-[10px] text-amber-500 font-cyber-mono uppercase tracking-widest">// status_expirado</span>
+            <span className="text-3xl font-extrabold text-amber-400 mt-2 font-cyber-mono text-glow-amber">{(expiredSecrets.toString()).padStart(3, '0')}</span>
           </div>
         </section>
 
@@ -276,100 +298,101 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Secrets List Table (2/3 width) */}
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-850 rounded-xl shadow-xl flex flex-col">
-            <div className="p-5 border-b border-slate-850 flex items-center justify-between">
+          <div className="lg:col-span-2 bg-[#09090f] border-2 border-slate-900 shadow-2xl flex flex-col relative">
+            {/* Corner accents */}
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-slate-700" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-slate-700" />
+
+            <div className="p-5 border-b border-slate-900 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">Cofre de Segredos</h2>
-                <p className="text-xs text-slate-400">Gerencie chaves, tokens e variáveis criptografadas</p>
+                <h2 className="text-sm font-bold font-cyber-mono text-white tracking-widest uppercase">// cofre_segredos</h2>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Acesso autorizado apenas. A descriptografia ocorre sob demanda.</p>
               </div>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center gap-1 bg-emerald-400 hover:bg-emerald-300 text-slate-950 px-3.5 py-1.8 rounded-lg font-medium text-xs transition duration-150 ease-in-out cursor-pointer"
+                className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500 hover:text-slate-950 text-amber-400 px-3 py-1.5 font-cyber-mono text-xs uppercase tracking-widest transition duration-150 ease-in-out cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.05)]"
               >
-                <Plus className="w-4 h-4" />
-                Novo Segredo
+                <Plus className="w-3.5 h-3.5" />
+                adicionar_segredo
               </button>
             </div>
 
             {loading ? (
-              <div className="p-8 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
-                <RefreshCw className="w-5 h-5 animate-spin text-emerald-500" />
-                Carregando segredos...
+              <div className="p-12 text-center text-slate-400 text-xs font-cyber-mono uppercase tracking-widest flex items-center justify-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
+                Consultando banco de dados...
               </div>
             ) : secrets.length === 0 ? (
-              <div className="p-12 text-center text-slate-500 text-sm flex flex-col items-center gap-2">
-                <Lock className="w-8 h-8 text-slate-700" />
-                <span>Nenhum segredo armazenado neste Vault.</span>
+              <div className="p-16 text-center text-slate-600 text-xs font-cyber-mono uppercase tracking-widest flex flex-col items-center gap-3">
+                <Lock className="w-8 h-8 text-slate-800 animate-pulse" />
+                <span>O cofre de segredos está vazio. Nenhum registro ativo.</span>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-850 text-left text-sm">
-                  <thead className="bg-slate-950/40 text-slate-400 text-xs font-semibold uppercase">
+                <table className="min-w-full divide-y-2 divide-slate-950 text-left text-xs font-cyber-mono">
+                  <thead className="bg-[#040407] text-slate-400 uppercase tracking-wider">
                     <tr>
-                      <th className="px-6 py-3">Identificador (Name)</th>
-                      <th className="px-6 py-3">Status</th>
-                      <th className="px-6 py-3">Versão</th>
-                      <th className="px-6 py-3">Expiração</th>
-                      <th className="px-6 py-3 text-right">Ações</th>
+                      <th className="px-6 py-4 font-bold">// identificador</th>
+                      <th className="px-6 py-4 font-bold">// status</th>
+                      <th className="px-6 py-4 font-bold">// versão</th>
+                      <th className="px-6 py-4 font-bold">// expiração</th>
+                      <th className="px-6 py-4 text-right font-bold">// ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-850">
+                  <tbody className="divide-y divide-slate-900 bg-[#09090f]">
                     {secrets.map((secret) => (
-                      <tr key={secret.id} className="hover:bg-slate-950/40 transition duration-100">
+                      <tr key={secret.id} className="hover:bg-[#040407]/45 transition duration-100">
                         <td className="px-6 py-4">
                           <div className="font-semibold text-white tracking-wide">{secret.name}</div>
                           {secret.description && (
-                            <div className="text-xs text-slate-400 mt-0.5 line-clamp-1">{secret.description}</div>
+                            <div className="text-[10px] text-slate-500 mt-1 lowercase line-clamp-1">{secret.description}</div>
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            secret.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            secret.status === 'REVOKED' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-none text-[10px] font-bold uppercase ${
+                            secret.status === 'ACTIVE' ? 'bg-emerald-500/5 text-emerald-400 border border-emerald-500/20 text-glow-green' :
+                            secret.status === 'REVOKED' ? 'bg-red-500/5 text-red-400 border border-red-500/20' :
+                            'bg-amber-500/5 text-amber-400 border border-amber-500/20 text-glow-amber'
                           }`}>
-                            {secret.status === 'ACTIVE' && <CheckCircle2 className="w-3 h-3" />}
-                            {secret.status === 'REVOKED' && <Trash2 className="w-3 h-3" />}
-                            {secret.status === 'EXPIRED' && <AlertTriangle className="w-3 h-3" />}
                             {secret.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-slate-300 font-mono">v{secret.version}</td>
-                        <td className="px-6 py-4 text-slate-400 text-xs">
-                          {secret.expires_at ? new Date(secret.expires_at).toLocaleDateString() : 'Sem expiração'}
+                        <td className="px-6 py-4 text-slate-300">v{secret.version}</td>
+                        <td className="px-6 py-4 text-slate-400">
+                          {secret.expires_at ? new Date(secret.expires_at).toLocaleDateString() : 'sem_expiracao'}
                         </td>
                         <td className="px-6 py-4 text-right flex justify-end gap-2">
                           <button
                             onClick={() => handleViewSecret(secret)}
                             title="Descriptografar e Visualizar"
-                            className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-950 rounded-lg transition cursor-pointer"
+                            className="p-1.5 border border-slate-800 bg-[#020204] text-slate-400 hover:border-emerald-500 hover:text-emerald-400 transition cursor-pointer"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           </button>
 
                           <button
                             onClick={() => handleOpenVersions(secret)}
-                            title="Histórico de Versões"
-                            className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-950 rounded-lg transition cursor-pointer"
+                            title="Histórico e Reversão"
+                            className="p-1.5 border border-slate-800 bg-[#020204] text-slate-400 hover:border-amber-500 hover:text-amber-400 transition cursor-pointer"
                           >
-                            <History className="w-4 h-4" />
+                            <History className="w-3.5 h-3.5" />
                           </button>
                           
                           {secret.status === 'ACTIVE' && (
                             <>
                               <button
                                 onClick={() => handleOpenEdit(secret)}
-                                title="Criar Nova Versão"
-                                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-950 rounded-lg transition cursor-pointer"
+                                title="Atualizar Segredo"
+                                className="p-1.5 border border-slate-800 bg-[#020204] text-slate-400 hover:border-amber-500 hover:text-amber-400 transition cursor-pointer"
                               >
-                                <Plus className="w-4 h-4" />
+                                <Plus className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleRevokeSecret(secret.id)}
-                                title="Revogar Segredo"
-                                className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-950 rounded-lg transition cursor-pointer"
+                                title="Revogar Registro"
+                                className="p-1.5 border border-slate-800 bg-[#020204] text-slate-450 hover:border-red-500 hover:text-red-400 transition cursor-pointer"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </>
                           )}
@@ -383,50 +406,52 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
           </div>
 
           {/* Live Audit Logs Panel (1/3 width) */}
-          <div className="bg-slate-900 border border-slate-850 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+          <div className="bg-[#09090f] border-2 border-slate-900 p-5 shadow-2xl flex flex-col gap-4 relative">
+            <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-slate-700" />
+            
             <div>
-              <h3 className="text-md font-semibold text-white flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-emerald-450" />
-                Logs de Auditoria
+              <h3 className="text-sm font-bold font-cyber-mono text-white flex items-center gap-1.5 uppercase tracking-wider">
+                <FileText className="w-4 h-4 text-amber-500" />
+                // trilha_de_auditoria
               </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                Atividades recentes e rastreabilidade de eventos
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">
+                Rastreamento de logs de segurança em tempo real
               </p>
             </div>
             
-            <div className="border-t border-slate-850 pt-4 flex-1 overflow-y-auto max-h-[450px] pr-1">
+            <div className="border-t border-slate-900 pt-4 flex-1 overflow-y-auto max-h-[450px] pr-1">
               {auditLogs.length === 0 ? (
-                <div className="text-xs text-slate-500 text-center py-4">Nenhum evento registrado ainda.</div>
+                <div className="text-[10px] font-cyber-mono text-slate-650 text-center py-6">// sem logs registrados</div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {auditLogs.map((log) => {
-                    let badgeColor = 'text-slate-400 bg-slate-950';
-                    if (log.event_type === 'CREATE_SECRET') badgeColor = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20';
-                    if (log.event_type === 'READ_SECRET') badgeColor = 'text-amber-400 bg-amber-500/10 border border-amber-500/20';
-                    if (log.event_type === 'UPDATE_SECRET' || log.event_type === 'RESTORE_VERSION') badgeColor = 'text-blue-400 bg-blue-500/10 border border-blue-500/20';
-                    if (log.event_type === 'REVOKE_SECRET') badgeColor = 'text-red-400 bg-red-500/10 border border-red-500/20';
+                    let textClass = 'text-slate-400';
+                    if (log.event_type === 'CREATE_SECRET') textClass = 'text-emerald-400';
+                    if (log.event_type === 'READ_SECRET') textClass = 'text-amber-400';
+                    if (log.event_type === 'UPDATE_SECRET' || log.event_type === 'RESTORE_VERSION') textClass = 'text-blue-400';
+                    if (log.event_type === 'REVOKE_SECRET') textClass = 'text-red-400';
 
                     const meta = typeof log.metadata === 'string' 
                       ? JSON.parse(log.metadata) 
                       : (log.metadata || {});
 
                     return (
-                      <div key={log.id} className="p-3 bg-slate-950/40 border border-slate-850/60 rounded-xl flex flex-col gap-1.5">
+                      <div key={log.id} className="p-2.5 bg-[#020204] border border-slate-900 flex flex-col gap-1 font-cyber-mono text-[10px]">
                         <div className="flex items-center justify-between">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider ${badgeColor}`}>
+                          <span className={`font-bold ${textClass}`}>
                             {log.event_type}
                           </span>
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-slate-600">
                             {new Date(log.created_at).toLocaleTimeString()}
                           </span>
                         </div>
-                        <div className="text-xs text-white font-medium">
-                          Segredo: <span className="font-mono text-slate-300">{log.secret_name || 'N/A'}</span>
+                        <div className="text-white mt-0.5">
+                          ID: <span className="text-slate-400 font-semibold">{log.secret_name || 'N/A'}</span>
                         </div>
                         {log.metadata && (
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {log.event_type === 'RESTORE_VERSION' && `v${meta.version} ← v${meta.restored_from}`}
-                            {log.event_type === 'UPDATE_SECRET' && `Criada versão v${meta.version}`}
+                          <div className="text-slate-500 text-[9px] lowercase">
+                            {log.event_type === 'RESTORE_VERSION' && `v${meta.version} restaurada de v${meta.restored_from}`}
+                            {log.event_type === 'UPDATE_SECRET' && `criou versão v${meta.version}`}
                           </div>
                         )}
                       </div>
@@ -441,58 +466,64 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
 
       {/* Modal: Novo Segredo */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-850 rounded-xl max-w-md w-full p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 font-cyber-mono crt-screen">
+          <div className="bg-[#09090f] border-2 border-amber-500/50 max-w-md w-full p-6 shadow-2xl relative">
+            {/* Corner Crosshairs */}
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-amber-500" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-amber-500" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-amber-500" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-amber-500" />
+
             <button 
               onClick={() => setShowCreateModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-white"
+              className="absolute right-4 top-4 text-slate-450 hover:text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-4">Adicionar Novo Segredo</h3>
+            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest text-glow-amber">// ADICIONAR_NOVO_SEGREDO</h3>
             
             <form onSubmit={handleCreateSecret} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Nome Identificador</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">nome_identificador</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: STRIPE_API_KEY"
+                  placeholder="EX: JWT_SECRET"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value.toUpperCase())}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Descrição</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">descrição</label>
                 <textarea
-                  placeholder="Breve descrição sobre a utilidade deste segredo"
+                  placeholder="digite a descrição..."
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs h-20 resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Valor do Segredo</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">conteudo_confidencial</label>
                 <input
                   type="password"
                   required
-                  placeholder="Digite o valor confidencial"
+                  placeholder="••••••••"
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Data de Expiração (Opcional)</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">data_de_expiracao (opcional)</label>
                 <input
                   type="datetime-local"
                   value={newExpires}
                   onChange={(e) => setNewExpires(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs text-slate-350"
                 />
               </div>
 
@@ -500,15 +531,15 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 border border-slate-800 rounded-lg text-xs hover:bg-slate-950 transition"
+                  className="px-4 py-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-white transition uppercase text-xs cursor-pointer"
                 >
-                  Cancelar
+                  cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold rounded-lg text-xs transition"
+                  className="px-4 py-2 border border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 transition uppercase text-xs cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.05)]"
                 >
-                  Salvar Segredo
+                  salvar_registro
                 </button>
               </div>
             </form>
@@ -518,35 +549,56 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
 
       {/* Modal: Visualizar Segredo */}
       {showViewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-850 rounded-xl max-w-md w-full p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 font-cyber-mono crt-screen">
+          <div className="bg-[#09090f] border-2 border-emerald-500/50 max-w-md w-full p-6 shadow-2xl relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-emerald-500" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-emerald-500" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-emerald-500" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-emerald-500" />
+
             <button 
-              onClick={() => setShowViewModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-white"
+              onClick={() => { setShowViewModal(false); setDecryptedValue(null); }}
+              className="absolute right-4 top-4 text-slate-450 hover:text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-2">Descriptografar Segredo</h3>
-            <p className="text-xs text-slate-400 mb-4">{viewSecretName} (versão v{viewSecretVersion})</p>
             
+            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest text-glow-green">// SAIDA_DESCRIPTOGRAFADA</h3>
+
             <div className="space-y-4">
-              <div className="bg-slate-950 p-4 border border-slate-800 rounded-lg font-mono text-sm break-all relative">
-                {decryptedValue === null ? (
-                  <div className="flex items-center justify-center gap-2 text-slate-400">
-                    <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />
-                    Descriptografando...
-                  </div>
-                ) : (
-                  <div className="text-emerald-400 select-all">{decryptedValue}</div>
-                )}
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest">identificador</span>
+                <div className="text-sm font-bold text-white mt-1">{viewSecretName}</div>
               </div>
 
-              <div className="flex justify-end">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest">versao_ativa</span>
+                <div className="text-xs text-slate-300 mt-1">v{viewSecretVersion}</div>
+              </div>
+
+              <div className="border-t border-slate-900 pt-4">
+                <span className="text-[10px] text-emerald-500 uppercase tracking-widest flex items-center gap-1">
+                  <Terminal className="w-3.5 h-3.5 animate-pulse" />
+                  valor_descriptografado
+                </span>
+                <div className="mt-2 p-3 bg-[#020204] border border-emerald-500/25 text-emerald-400 font-cyber-mono text-sm break-all select-all text-glow-green shadow-[0_0_12px_rgba(34,197,94,0.05)]">
+                  {decryptedValue === null ? (
+                    <span className="text-slate-650 flex items-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      executando descriptografia RSA-OAEP...
+                    </span>
+                  ) : (
+                    decryptedValue
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
                 <button
-                  onClick={() => setShowViewModal(false)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-xs transition"
+                  onClick={() => { setShowViewModal(false); setDecryptedValue(null); }}
+                  className="px-4 py-2 border border-emerald-500 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 transition uppercase text-xs cursor-pointer shadow-[0_0_10px_rgba(34,197,94,0.05)]"
                 >
-                  Fechar
+                  fechar
                 </button>
               </div>
             </div>
@@ -554,47 +606,53 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
         </div>
       )}
 
-      {/* Modal: Atualizar Segredo / Nova Versão */}
+      {/* Modal: Editar Segredo */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-850 rounded-xl max-w-md w-full p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 font-cyber-mono crt-screen">
+          <div className="bg-[#09090f] border-2 border-amber-500/50 max-w-md w-full p-6 shadow-2xl relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-amber-500" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-amber-500" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-amber-500" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-amber-500" />
+
             <button 
               onClick={() => setShowEditModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-white"
+              className="absolute right-4 top-4 text-slate-455 hover:text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-4">Atualizar Segredo (Criar v + 1)</h3>
+            <h3 className="text-sm font-bold text-white mb-6 uppercase tracking-widest text-glow-amber">// ATUALIZAR_VERSAO_DO_SEGREDO</h3>
             
             <form onSubmit={handleUpdateSecret} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Descrição</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">descrição</label>
                 <textarea
+                  placeholder="digite a descrição..."
                   value={editDesc}
                   onChange={(e) => setEditDesc(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs h-20 resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Novo Valor do Segredo</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">novo_conteudo_confidencial</label>
                 <input
                   type="password"
                   required
-                  placeholder="Digite o novo valor confidencial"
+                  placeholder="••••••••"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 uppercase tracking-wide">Data de Expiração (Opcional)</label>
+                <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-widest">data_de_expiracao (opcional)</label>
                 <input
                   type="datetime-local"
                   value={editExpires}
                   onChange={(e) => setEditExpires(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:outline-none focus:border-emerald-500 text-sm"
+                  className="mt-1.5 block w-full px-3 py-2.5 border border-slate-800 bg-[#020204] text-white focus:outline-none focus:border-amber-500 text-xs text-slate-355"
                 />
               </div>
 
@@ -602,15 +660,15 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="px-4 py-2 border border-slate-800 rounded-lg text-xs hover:bg-slate-950 transition"
+                  className="px-4 py-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-white transition uppercase text-xs cursor-pointer"
                 >
-                  Cancelar
+                  cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-semibold rounded-lg text-xs transition"
+                  className="px-4 py-2 border border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 transition uppercase text-xs cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.05)]"
                 >
-                  Criar Nova Versão
+                  salvar_nova_versao
                 </button>
               </div>
             </form>
@@ -620,53 +678,49 @@ export default function Dashboard({ username, onLogout }: DashboardProps) {
 
       {/* Modal: Histórico de Versões */}
       {showVersionsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-850 rounded-xl max-w-md w-full p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 font-cyber-mono crt-screen">
+          <div className="bg-[#09090f] border-2 border-amber-500/50 max-w-md w-full p-6 shadow-2xl relative">
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-amber-500" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-amber-500" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-amber-500" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-amber-500" />
+
             <button 
               onClick={() => setShowVersionsModal(false)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-white"
+              className="absolute right-4 top-4 text-slate-450 hover:text-white cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-lg font-bold text-white mb-2">Histórico de Versões</h3>
-            <p className="text-xs text-slate-400 mb-4">{viewSecretName}</p>
+            <h3 className="text-sm font-bold text-white mb-2 uppercase tracking-widest text-glow-amber">// CONTROLE_DE_VERSOES_HISTORICAS</h3>
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-6">Selecione uma versão histórica para reverter</p>
             
-            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1 border-t border-slate-900 pt-4">
               {secretVersions.length === 0 ? (
-                <div className="text-center text-slate-500 text-sm py-4">Carregando versões...</div>
+                <div className="text-[10px] text-slate-500 text-center py-6">// consultando banco de dados de versões...</div>
               ) : (
-                <div className="divide-y divide-slate-850">
-                  {secretVersions.map((v) => (
-                    <div key={v.id} className="py-3 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-white font-mono">
-                          Versão v{v.version} {v.version === viewSecretVersion && <span className="text-xs text-emerald-400 font-sans ml-1">(Atual)</span>}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          Criado em: {new Date(v.created_at).toLocaleString()}
-                        </div>
-                      </div>
-                      
-                      {v.version !== viewSecretVersion && (
-                        <button
-                          onClick={() => handleRollback(v.version)}
-                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-medium rounded-lg text-xs transition cursor-pointer"
-                        >
-                          Restaurar
-                        </button>
-                      )}
+                secretVersions.map((v) => (
+                  <div key={v.id} className="p-3 bg-[#020204] border border-slate-900 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-white text-xs">versão: v{v.version}</div>
+                      <div className="text-[9px] text-slate-500 lowercase mt-0.5">{new Date(v.created_at).toLocaleString()}</div>
                     </div>
-                  ))}
-                </div>
+                    <button
+                      onClick={() => handleRollback(v.version)}
+                      className="px-2.5 py-1 border border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 transition uppercase text-[10px] cursor-pointer"
+                    >
+                      reverter
+                    </button>
+                  </div>
+                ))
               )}
             </div>
 
-            <div className="mt-4 pt-4 border-t border-slate-850 flex justify-end">
+            <div className="pt-4 flex justify-end border-t border-slate-900 mt-4">
               <button
                 onClick={() => setShowVersionsModal(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-white rounded-lg text-xs transition cursor-pointer"
+                className="px-4 py-2 border border-slate-800 text-slate-400 hover:border-slate-650 hover:text-white transition uppercase text-xs cursor-pointer"
               >
-                Fechar
+                fechar
               </button>
             </div>
           </div>

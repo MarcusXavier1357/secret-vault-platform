@@ -75,8 +75,8 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 
 		var resp map[string]string
 		json.Unmarshal(rr.Body.Bytes(), &resp)
-		if resp["error"] != "Invalid request payload" {
-			t.Errorf("expected error 'Invalid request payload', got '%s'", resp["error"])
+		if resp["error"] != "Payload da requisição inválido" {
+			t.Errorf("expected error 'Payload da requisição inválido', got '%s'", resp["error"])
 		}
 	})
 
@@ -95,7 +95,7 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 
 		var resp map[string]string
 		json.Unmarshal(rr.Body.Bytes(), &resp)
-		if !strings.Contains(resp["error"], "Must be uppercase alphanumeric") {
+		if !strings.Contains(resp["error"], "Deve conter apenas letras maiúsculas") {
 			t.Errorf("expected validation message, got '%s'", resp["error"])
 		}
 	})
@@ -115,8 +115,8 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 
 		var resp map[string]string
 		json.Unmarshal(rr.Body.Bytes(), &resp)
-		if resp["error"] != "Secret value cannot be empty" {
-			t.Errorf("expected error 'Secret value cannot be empty', got '%s'", resp["error"])
+		if resp["error"] != "O valor do segredo não pode ser vazio" {
+			t.Errorf("expected error 'O valor do segredo não pode ser vazio', got '%s'", resp["error"])
 		}
 	})
 
@@ -137,8 +137,8 @@ func TestCreateSecretPayloadValidation(t *testing.T) {
 
 		var resp map[string]string
 		json.Unmarshal(rr.Body.Bytes(), &resp)
-		if resp["error"] != "Expiration date must be in the future" {
-			t.Errorf("expected error 'Expiration date must be in the future', got '%s'", resp["error"])
+		if resp["error"] != "A data de expiração deve ser no futuro" {
+			t.Errorf("expected error 'A data de expiração deve ser no futuro', got '%s'", resp["error"])
 		}
 	})
 }

@@ -61,7 +61,7 @@ describe('Dashboard Component', () => {
     render(<Dashboard username="admin" onLogout={() => {}} />);
 
     // Check loading indicator shows up initially
-    expect(screen.getByText(/carregando segredos/i)).toBeInTheDocument();
+    expect(screen.getByText(/consultando banco de dados/i)).toBeInTheDocument();
 
     // Wait for the data to resolve and render
     await waitFor(() => {
@@ -70,14 +70,15 @@ describe('Dashboard Component', () => {
     });
 
     // Check metrics are correct
-    expect(screen.getByText('Total de Segredos').nextElementSibling?.textContent).toBe('2');
-    expect(screen.getByText('Ativos').nextElementSibling?.textContent).toBe('1');
-    expect(screen.getByText('Revogados').nextElementSibling?.textContent).toBe('1');
+    expect(screen.getByText('// total_de_segredos').nextElementSibling?.textContent).toBe('002');
+    expect(screen.getByText('// status_ativo').nextElementSibling?.textContent).toBe('001');
+    expect(screen.getByText('// status_revogado').nextElementSibling?.textContent).toBe('001');
 
     // Check audit logs render in sidebar
-    expect(screen.getByText('Logs de Auditoria')).toBeInTheDocument();
+    expect(screen.getByText('// trilha_de_auditoria')).toBeInTheDocument();
     expect(screen.getByText('CREATE_SECRET')).toBeInTheDocument();
   });
+
 
   it('renders error notification when API fails', async () => {
     // Mock API query failures
@@ -86,8 +87,9 @@ describe('Dashboard Component', () => {
     render(<Dashboard username="admin" onLogout={() => {}} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Falha na comunicação')).toBeInTheDocument();
+      expect(screen.getByText(/Falha na comunicação/i)).toBeInTheDocument();
     });
   });
 });
+
 
