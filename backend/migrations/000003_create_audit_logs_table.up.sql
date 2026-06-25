@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    secret_id UUID REFERENCES secrets(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    metadata JSONB
+);
